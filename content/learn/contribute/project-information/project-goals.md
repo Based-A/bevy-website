@@ -24,12 +24,15 @@ Goals are tracked on the [Project Goals Board](https://github.com/orgs/bevyengin
 - Goals can organically change over time. If we learn something new and it makes sense to break up a Goal into multiple Goals, add sub-Goals, or reframe the Goal ... do it!
 - Goals inherently require _collaboration_ to bring them to completion. They are never the work of a single individual. At the very least, there is someone coming up with a design / implementation, and one or more **SME** verifying the design / implementation.
 - Goals are inherently `X-Needs-SME`, so they should be given that label.
-- Anything that needs a Goal, but doesn't currently have one should be labeled with `C-Needs-Goal`.
-- Goals are only created by **SMEs** and **Maintainers**. The intent behind this restriction is that Goals are a "public facing" / marketing thing, so phrasing and framing is important. Every new Goal gets added to the Proposed goal column on the public Project Goals board. Going through SMEs + Maintainers ensures redundancies are avoided, noise is kept to a minimum, consistency is enforced, templates are used, framing / public image / marketing is taken into account, etc. This is just as true for closed Goals, which exist to be a nice consolidated list of things the project definitely doesn't want to do.
+- Anything that needs a Goal, but doesn't currently have one should be labeled with `S-Needs-Goal`.
+- Goals are typically created by **SMEs** or **Maintainers**.
+  - However, trusted contributors may create Goals after discussion with at least one **SME** or **Maintainer**.
+  - Goals created without following this process will be deleted without consideration, and a warning will be issued.
+  - The intent behind this restriction is that Goals are a "public facing" / marketing thing, so phrasing and framing is important. Every new Goal gets added to the Proposed goal column on the public Project Goals board. Going through SMEs + Maintainers ensures redundancies are avoided, noise is kept to a minimum, consistency is enforced, templates are used, framing / public image / marketing is taken into account, etc. This is just as true for closed Goals, which exist to be a nice consolidated list of things the project definitely doesn't want to do.
 
 ## When does an Issue or PR need a Goal?
 
-- In general, `C-Needs-Goal` is a measure of investment, risk, and publicity. If SMEs cannot resolve the work with a very short time investment and low risk, or the work is an ongoing thing, it almost certainly needs a Goal. If it has significant implications for public reception or has significant public interest, it needs a Goal.
+- In general, `S-Needs-Goal` is a measure of investment, risk, and publicity. If SMEs cannot resolve the work with a very short time investment and low risk, or the work is an ongoing thing, it almost certainly needs a Goal. If it has significant implications for public reception or has significant public interest, it needs a Goal.
 - When in doubt, it probably needs a Goal
 - Is the work a part of a larger whole? If yes, that "whole" probably needs a Goal
 - Does the work require a long iterative development process? If yes, it probably needs a Goal
@@ -84,7 +87,7 @@ The SMEs staffing a Goal should be listed in the Goal's description.
     - By default this issue is not a Goal, but **SMEs**, **Maintainers**, and the **Project Lead** can skip to step (5) and create proposed Goal issues directly.
 2. The Triage Team assigns it to an **Area**
 3. A [Github Project Workflow](https://docs.github.com/en/issues/planning-and-tracking-with-projects/automating-your-project/using-the-built-in-automations) adds it to the **Area Project**
-4. **SMEs** identify that the issue needs a goal and apply the `C-Needs-Goal` label
+4. **SMEs** identify that the issue needs a goal and apply the `S-Needs-Goal` label
 5. **SMEs** discuss the framing of the Goal and create a new issue with the `C-Goal` label.
 6. A Github Project Workflow picks up the `C-Goal` issue and adds it to the **Project Goals** board in the Proposed state.
 7. The **Project Lead** and **SMEs** discuss how to handle the Goal: Deny, Inactive (Approved), or Postpone. Approval is contingent on an **SME** agreeing to staff it, and put energy into helping the Working Group bring it to completion.
@@ -94,7 +97,10 @@ The SMEs staffing a Goal should be listed in the Goal's description.
 
 ## Goal Issue Template
 
-Only SMEs and Maintainers should create new Goals (see rationale in the "What is a Goal?" section above)! If that is you, copy this template when creating a new Goal. We put this template here, rather than adding it as a GitHub issue template, because we don't want normal users creating Goals.
+Typically, only SMEs and Maintainers should create new Goals (see rationale in the "What is a Goal?" section above)!
+However, trusted contributors may create a goal after discussion with relevant SMEs and Maintainers.
+
+If that is you, copy this template when creating a new Goal. We put this template here, rather than adding it as a GitHub issue template, because we don't want normal users creating Goals.
 
 1. Name the Goal. This should be a short, functional name, as it would be communicated to the public. This is a market-able "feature name", like "PBR Renderer", "Relationships", etc. Avoid using things like "initial" or "MVP" in the name, as this is implied.
 2. Add the `C-Goal` and `X-Needs-SME` labels.
