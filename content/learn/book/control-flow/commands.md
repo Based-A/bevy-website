@@ -6,28 +6,18 @@ weight = 5
 status = 'hidden'
 +++
 
-**Commands** represent instructions for manipulations to perform on the world, the next time that we have access to all of it once.
+When we want to make structural changes to our application, we require mutable access to the `World`. Since only one system can mutably access the `World` at a time, we need a way to organize that access. **Commands** allow us to do just that. Each [`Command`] represents an instruction for manipulations to be performed on the world, and when we call a `Command` it gets placed in the **Command Queue**. All [`Commands`] in this queue are then ran at a specific time when we're safely able to mutably access the `World`.
 
-Many operations in the ECS can only be done via exclusive world access, such as:
+Many operations in the ECS can *only* be done via exclusive world access, such as:
 
 - Spawning and Despawning Entities
 
 ```rust
-// Spawn a new Entity with `bundle` Components.
+// Spawn a new Entity with a `bundle` of Components.
 commands.spawn(bundle);
 
 // Despawn the `entity` Entity.
 commands.entity(entity).despawn(); 
-```
-
-- Adding and Removing Components
-
-```rust
-// Insert `bundle` Components into `entity` Entity.
-commands.entity(entity).insert(bundle);
-
-// Remove `bundle` Components from `entity` Entity.
-commands.entity(entity).remove(bundle); 
 ```
 
 - Inserting and Removing Resources
@@ -57,9 +47,77 @@ commands.run_schedule(schedule);
 commands.trigger(event); 
 ```
 
-Commands allow users to queue up these changes as part of systems, deferring the work until later to avoid disrupting both system parallelism and data-oriented access of components.
+To use `Commands` in your systems, it is easiest to pass it in as a system parameter. This ensures that every system that needs access to `Commands` gets it and that all `Commands` that are called are placed into the `Command` queue.
 
-When applying changes to a single entity, the [`Commands`] type is transformed into [`EntityCommands`] via [`Commands::entity`]. While the [`Command`] trait can have arbitrary effect on the [`World`], the [`EntityCommand`] trait is designed to modify a single entity.
+```rust
+fn my_system(mut commands: Commands) {
+    // Some functionality that modifies the World!
+}
+```
+
+[`Commands`]: https://docs.rs/bevy/latest/bevy/ecs/prelude/struct.Commands.html
+[`Command`]: https://docs.rs/bevy/latest/bevy/prelude/trait.Command.html
+
+## When Do Commands Take Effect?
+
+`Commands` allow users to queue up changes as part of systems, deferring the work until later to avoid disrupting both system parallelism and data-oriented access of components. Specifically, `Commands` are applied whenever a [`Schedule`] is completed. Ordinarily, this will occur multiple times during and after each frame. As a result, systems will always see the effects of `Commands` queued by systems in other schedules.
+
+```rust
+// An Event we want to trigger.
+#[derive(Event)]
+struct UpdateEvent;
+
+// Add our Systems to their Schedules.
+app.add_systems(Startup, insert_observer_system);
+app.add_system(Update, update_system);
+
+// This System will run in the `Startup` schedule.
+fn insert_observer_system(mut commands: Commands) {
+    commands.add_observer(|update: On<UpdateEvent>| {
+        println!("This runs every Update!");
+    });
+}
+
+// Meanwhile this System runs in the `Update` schedule.
+fn update_system(mut commands: Commands) {
+    commands.trigger(UpdateEvent);
+}
+```
+
+In the above example, we have two systems: `insert_observer_system` running in the `Startup` schedule and `update_system` running in the `Update` schedule. Since the `Startup` schedule only runs once, the `add_observer()` command is only ran once when our applications is launched. However the `trigger()` command is run everytime the `Update` schedule finishes, meaning that a `trigger()` command is sent to the queue and ran every time `Update` completes.
+
+In addition, if a system with `Commands` is ordered before another system, that system will always see the effects of the `Commands` in the first system. Bevy ensures this occurs by dynamically inserting synchronization points, during which all `Commands` are applied. Each system can hold their own copy of `Commands` in their local system state. When `Commands` are applied, these queues are evaluated as in the same order that the systems were run. Within each system, the `Commands` are applied in a first-in-first-out order.
+
+```rust
+// Add our Systems in the same Schedule, but placed in a specific order.
+app.add_systems(
+    Update, (
+        add_the_component, 
+        remove_the_component.after(add_the_component)
+        // `after` specifies that the `remove_the_component` System 
+        // will only run after `add_the_component` has completed.
+    )
+);
+
+// This System will add the TargetComponent to the `player` Entity.
+fn add_the_component(mut commands: Commands, mut player: Single<Entity, Without<TargetComponent>) {
+    commands.entity(player).insert_if_new((TargetComponent));
+    println!("TargetComponent added!");
+}
+
+// This System will remove the TargetComponent from the `player` Entity.
+fn remove_the_component(mut commands: Commands, mut player: Single<Entity, With<TargetComponent>) {
+    commands.entity(player).remove((TargetComponent));
+    println!("TargetComponent removed!");
+}
+
+```
+
+[`Schedule`]: https://docs.rs/bevy/latest/bevy/prelude/struct.Schedule.html
+
+## Entity Commands
+
+Apart from making changes to the `World`, `Commands` are also used when making structural changes to `Entities`. When applying changes to a single entity, the [`Commands`] type is transformed into [`EntityCommands`] via [`Commands::entity`]. While the `Command` trait can have arbitrary effect on the `World`, the [`EntityCommand`] trait is designed to modify a single entity.
 
 ```rust
 // Marker Component for a Player.
@@ -79,6 +137,14 @@ let player_commands = commands.entity(player);
 // This adds a Health Component to the `player` Entity if it doesn't already exist.
 player_commands.insert_if_new((Health(10)));
 ```
+
+Like `Commands`, `EntityCommands` aren't run immediately. This means that it is possible for the `Entity` you want to modify to have despawned before the `EntityCommand` can be ran. All `EntityCommands` will check whether the `Entity` exists when the `EntityCommand` is ran and will return an error if it doesn't. 
+
+[`EntityCommands`]: https://docs.rs/bevy/latest/bevy/prelude/struct.EntityCommands.html
+[`Commands::entity`]: https://docs.rs/bevy/latest/bevy/ecs/prelude/struct.Commands.html#method.entity
+[`EntityCommand`]: https://docs.rs/bevy/latest/bevy/prelude/trait.EntityCommand.html
+
+## Parallel Commands
 
 If you want to send commands from within a parallel context (such as via [`Query::par_iter_mut`]), [`ParallelCommands`] can be used.
 
@@ -100,72 +166,10 @@ fn parallel_command_system(
 
 Even more broadly, custom [`Commands`]-like [`SystemParam`] can be constructed with the use of the generic [`Deferred`] system parameter.
 
-[`Commands`]: https://docs.rs/bevy/latest/bevy/ecs/prelude/struct.Commands.html
-[`EntityCommands`]: https://docs.rs/bevy/latest/bevy/prelude/struct.EntityCommands.html
-[`Commands::entity`]: https://docs.rs/bevy/latest/bevy/ecs/prelude/struct.Commands.html#method.entity
-[`Command`]: https://docs.rs/bevy/latest/bevy/prelude/trait.Command.html
-[`World`]: https://docs.rs/bevy/latest/bevy/prelude/struct.World.html
-[`EntityCommand`]: https://docs.rs/bevy/latest/bevy/prelude/trait.EntityCommand.html
 [`Query::par_iter_mut`]: https://docs.rs/bevy/latest/bevy/ecs/prelude/struct.Query.html#method.par_iter_mut
 [`ParallelCommands`]: https://docs.rs/bevy/latest/bevy/prelude/struct.ParallelCommands.html
 [`SystemParam`]: https://docs.rs/bevy/latest/bevy/ecs/system/trait.SystemParam.html
 [`Deferred`]: https://docs.rs/bevy/latest/bevy/prelude/struct.Deferred.html
-
-## When Do Commands Take Effect?
-
-Commands are applied whenever a [`Schedule`] is completed. Ordinarily, this will occur multiple times during and after each frame. As a result, systems will always see the effects of commands queued by systems in other schedules.
-
-```rust
-// An Event we want to trigger.
-#[derive(Event)]
-struct UpdateEvent;
-
-// Add our Systems to their Schedules.
-app.add_systems(Startup, insert_observer_system);
-app.add_system(Update, update_system);
-
-// This System will run in the `Startup` schedule, meaning that when our application launches this Observer is added.
-fn insert_observer_system(mut commands: Commands) {
-    commands.add_observer(|update: On<UpdateEvent>| {
-        println!("This runs every Update!");
-    });
-}
-
-// Meanwhile this System runs in the `Update` schedule, so once our application is loaded 
-// and begins to run, this System will run everytime the `Update` Schedule runs.
-fn update_system(mut commands: Commands) {
-    commands.trigger(UpdateEvent);
-}
-```
-
-In addition, if a system with [`Commands`] is ordered before another system, that system will always see the effects of the commands in the first system. Bevy ensures this occurs by dynamically inserting synchronization points, during which all commands are applied. Each system can hold their own copy of [`Commands`] in their local system state. When commands are applied, these queues are evaluated as in the same order that the systems were run. Within each system, the commands are applied in a first-in-first-out order.
-
-```rust
-// Add our Systems in the same Schedule, but placed in a specific order.
-app.add_systems(
-    Update, (
-        add_the_component, 
-        remove_the_component.after(add_the_component)
-        // `after` specifies that the `remove_the_component` System 
-        // will only run after `add_the_component` had completed.
-    )
-);
-
-// This System will add the TargetComponent to the `player` Entity.
-fn add_the_component(mut commands: Commands, mut player: Single<Entity, Without<TargetComponent>) {
-    commands.entity(player).insert_if_new((TargetComponent));
-    println!("TargetComponent added!");
-}
-
-// This System will remove the TargetComponent from the `player` Entity.
-fn remove_the_component(mut commands: Commands, mut player: Single<Entity, With<TargetComponent>) {
-    commands.entity(player).remove((TargetComponent));
-    println!("TargetComponent removed!");
-}
-
-```
-
-[`Schedule`]: https://docs.rs/bevy/latest/bevy/prelude/struct.Schedule.html
 
 ## Custom Commands
 
