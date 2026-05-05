@@ -9,7 +9,7 @@ Most developers want their game to be interactive.
 If a player provides some kind of input, the game should react or change in some way.
 To make this happen, we first need to receive the input data from the player: typically through an input device.
 
-Additionally, we might also want to read the context in which the input was created under.
+Additionally, we might also want to know the context that the input was created under.
 Is a button being actively held down?
 Was a button just released?
 Is an input being repeatedly sent?
@@ -33,7 +33,7 @@ Bevy currently does not have a built-in solution for this, however we can point 
 
 Additionally, if you're finding that there isn't an existing solution that fits your project, you can also make your own input manager!
 However that is well beyond the scope of what we'll cover here.
-Instead, the rest of this page will cover the process Bevy uses for reading input data and making it available for use in your game or library.
+Instead, the rest of this page will cover how Bevy reads input data and makes it available for an input manager to use.
 
 [Winit]: https://crates.io/crates/winit
 [`bevy_enhanced_input`]: https://github.com/simgine/bevy_enhanced_input
@@ -43,9 +43,9 @@ Instead, the rest of this page will cover the process Bevy uses for reading inpu
 
 [`bevy_input`]: https://docs.rs/bevy/latest/bevy/input/index.html
 
-## Reading Winit Events
+## Reading Input Events
 
-The input data process begins at the device itself, with some kind of input event being generated and sent to the computer which the device is connected to.
+Getting input data starts with the device itself, with an input event being generated and then sent to the computer which the device is connected to.
 Bevy uses [Winit] (via [`bevy_winit`], Bevy's conversion layer for Winit) to read the event and process the input data.
 The processed input data is then turned into a [`Message`] and made available to us for the first time.
 Each type of input has a unique `Messages<M>` resource created and registered when the game is started, [`KeyboardInput`] for keyboard button presses, [`MouseMotion`] for mouse movements, etc.
@@ -89,39 +89,63 @@ Instead, input messages are better suited for testing and logging input events, 
 [`MessageWriter`]: https://docs.rs/bevy/latest/bevy/prelude/struct.MessageWriter.html
 [`MessageMutator`]: https://docs.rs/bevy/latest/bevy/ecs/message/struct.MessageMutator.html
 
-## Input Resources
+## Input System Parameters 
 
 Input messages can be beneficial for some scenarios, however we have a more convenient way of accessing input data.
 Instead of needing to read each message, Bevy allows us to access system parameters and a variety of methods to quickly see what input is being sent along with how the input is being sent.
 
+Mouse and keyboard inputs are accessed through `Resources`, specifically a [`ButtonInput<KeyCode>`] or [`ButtonInput<Key>`] for keyboard button presses, and [`AccumulatedMouseMotion`], [`AccumulatedMouseScroll`], and [`ButtonInput<MouseButton>`] for mouse movement, scroll, and button presses respectively.
+
 ```rust
-fn keyboard_input_system(
+fn keyboard_mouse_system(
     keyboard_input: Res<ButtonInput<KeyCode>>,
+    mouse_input: Res<AccumulatedMouseMotion>,
 ) {
     if keyboard_input.just_pressed(KeyCode::KeyA) {
         info!("'A' was just pressed");
     }
+    if mouse_input.delta != Vec2::ZERO {
+        let delta = mouse_motion.delta;
+        info!("mouse moved ({}, {})", delta.x, delta.y);
+    }
 }
 ```
 
-Mouse and keyboard inputs are accessed through `Resources`, specifically a [`ButtonInput<KeyCode>`] or [`ButtonInput<Key>`] for keyboard button presses, and [`AccumulatedMouseMotion`], [`AccumulatedMouseScroll`], and [`ButtonInput<MouseButton>`] for mouse movement, scroll, and button presses respectively.
-
-
-
 Meanwhile, gamepad input can be accessed through a `Query` that targets the [`Gamepad`] component.
 We aren't able to use a `Resource` for gamepads as there could be multiple gamepads connected at once (like with party games or split-screen gamemodes).
-Since each gamepad is functionaly the same in Bevy, we have no way of inherently separating the input data of one gamepad from another.
 
+Each gamepad is functionally identical in Bevy.
+A `Gamepad` contains some metadata about the gamepad (like its name or device ID) and two components: [`GamepadButton`] and [`GamepadAxis`].
+`GamepadButton` is an enum containing a list of buttons that Bevy recognizes for gamepads (like DPads, triggers, start buttons, etc.), while `GamepadAxis` is an enum with all potential joytstick inputs for a gamepad.
 
+```rust
+fn gamepad_system(gamepads: Query<(Entity, &Gamepad)>) {
+    for (entity, gamepad) in &gamepads {
+        if gamepad.just_pressed(GamepadButton::South) {
+            info!("{} just pressed South", entity);
+        } else if gamepad.just_released(GamepadButton::South) {
+            info!("{} just released South", entity);
+        }
+        let right_trigger = gamepad.get(GamepadButton::RightTrigger2).unwrap();
+        if right_trigger.abs() > 0.01 {
+            info!("{} RightTrigger2 value is {}", entity, right_trigger);
+        }
+        let left_stick_x = gamepad.get(GamepadAxis::LeftStickX).unwrap();
+        if left_stick_x.abs() > 0.01 {
+            info!("{} LeftStickX value is {}", entity, left_stick_x);
+        }
+    }
+}
+```
 
 {% callout(type="info") %}
 
 #### What Makes An Input "Button-like"?
 
-You might have noticed that some input data is accessed through a `ButtonInput` struct, while others aren't.
+You might have noticed that some input data is accessed through a `ButtonInput` struct (or a `GamepadButton` for a gamepad), while others aren't.
 This may lead you to wonder what makes an input "button-like"?
 
-It's actually very straightforward.
+It's actually fairly straightforward.
 To be considered "button-like" in Bevy, the input has to be "press-able".
 This means that Bevy can register the state of the input as either `pressed` or `released`.
 Both of these values are explicitly stored in a [`ButtonState`] enum, which is recorded as a part of every "button-like" input event.
@@ -139,33 +163,37 @@ However, the direction you move the joystick in is not "press-able", and therefo
 [`AccumulatedMouseScroll`]: https://docs.rs/bevy/latest/bevy/input/mouse/struct.AccumulatedMouseScroll.html
 [`ButtonInput<MouseButton>`]: https://docs.rs/bevy/latest/bevy/input/mouse/enum.MouseButton.html
 [`Gamepad`]: https://docs.rs/bevy/latest/bevy/input/gamepad/struct.Gamepad.html
+[`GamepadButton`]: https://docs.rs/bevy/latest/bevy/prelude/enum.GamepadButton.html
+[`GamepadAxis`]: https://docs.rs/bevy/latest/bevy/prelude/enum.GamepadAxis.html
 
 ### Pressed Versus Just Pressed
 
 Each [`ButtonInput`] resource and [`Gamepad`] component provide us with methods that let us access information about the state of a button.
 For example, there are different methods which will return a `bool` based on if the button has just been pressed ([`just_pressed`]), is currently being pressed ([`pressed`]), or if its just been released ([`just_released`]).
 
+Although it might appear like the difference between [`pressed`] and [`just_pressed`] is negligible, the two are quite distinct.
+While both signal a `ButtonInput` button being activated, `pressed` is continuously `true` until the input is released.
+`just_pressed` will only be `true` for _a single frame_ after the input is activated.
+The same is true for [`just_released`], which will only be `true` for a single frame after the input is deactivated.
+
 ```rust
-// This system provides access to KeyCode input data from a `ButtonInput` resource.
 fn keyboard_input_system(
     keyboard_input: Res<ButtonInput<KeyCode>>,
 ) {
+    // Returns `true` while A is currently being pressed.
     if keyboard_input.pressed(KeyCode::KeyA) {
         info!("'A' is currently being pressed");
     }
+    // Returns `true` for one frame after A is pressed.
     if keyboard_input.just_pressed(KeyCode::KeyA) {
         info!("'A' was just pressed");
     }
+    // Returns `true` for one frame after A is released.
     if keyboard_input.just_released(KeyCode::KeyA) {
         info!("'A' was just released");
     }
 }
 ```
-
-Although it might appear like the difference between [`pressed`] and [`just_pressed`] is negligible, the two are quite distinct.
-While both signal a `ButtonInput` button being activated, `pressed` is continuously `true` until the input is released.
-`just_pressed` will only be `true` for _a single frame_ after the input is activated.
-The same is true for [`just_released`], which will only be `true` for a single frame after the input is deactivated.
 
 [`ButtonInput`]: https://docs.rs/bevy/latest/bevy/input/struct.ButtonInput.html
 [`pressed`]: https://docs.rs/bevy/latest/bevy/input/struct.ButtonInput.html#method.pressed
@@ -174,8 +202,7 @@ The same is true for [`just_released`], which will only be `true` for a single f
 
 ### Button Combinations
 
-We aren't limited to only accessing one button input at a time.
-We're able to create button combinations by accessing multiple buttons within a `ButtonInput` or `Gamepad`.
+Button combinations can be made by accessing multiple buttons within a `ButtonInput` or `Gamepad`.
 Using the [`any_pressed`], [`any_just_pressed`], or [`any_just_released`] methods allow us to establish AND logic for handling combinations.
 Alternatively, we could use the [`all_pressed`], [`all_just_pressed`], and [`all_just_released`] methods and supply a list of button inputs instead.
 
