@@ -115,8 +115,8 @@ Meanwhile, gamepad input can be accessed through a `Query` that targets the [`Ga
 We aren't able to use a `Resource` for gamepads as there could be multiple gamepads connected at once (like with party games or split-screen gamemodes).
 
 Each gamepad is functionally identical in Bevy.
-A `Gamepad` contains some metadata about the gamepad (like its name or device ID) and two components: [`GamepadButton`] and [`GamepadAxis`].
-`GamepadButton` is an enum containing a list of buttons that Bevy recognizes for gamepads (like DPads, triggers, start buttons, etc.), while `GamepadAxis` is an enum with all potential joytstick inputs for a gamepad.
+A `Gamepad` contains some metadata about the gamepad (like its name or device ID) and two components: a `ButtonInput` containing all [`GamepadButton`]s and an `Axis` containing all [`GamepadAxis`] inputs.
+The `GamepadButton` type is an enum containing a list of buttons that Bevy recognizes for gamepads (like DPads, triggers, start buttons, etc.), while `GamepadAxis` is an enum with all potential joytstick inputs for a gamepad.
 
 ```rust
 fn gamepad_system(gamepads: Query<(Entity, &Gamepad)>) {
@@ -169,7 +169,7 @@ However, the direction you move the joystick in is not "press-able", and therefo
 ### Pressed Versus Just Pressed
 
 Each [`ButtonInput`] resource and [`Gamepad`] component provide us with methods that let us access information about the state of a button.
-For example, there are different methods which will return a `bool` based on if the button has just been pressed ([`just_pressed`]), is currently being pressed ([`pressed`]), or if its just been released ([`just_released`]).
+For example, both `ButtonInput` and `Gamepad` have methods which return a `bool` based on if the button has just been pressed ([`ButtonInput::just_pressed`]), is currently being pressed ([`ButtonInput::pressed`]), or if its just been released ([`ButtonInput::just_released`]).
 
 Although it might appear like the difference between [`pressed`] and [`just_pressed`] is negligible, the two are quite distinct.
 While both signal a `ButtonInput` button being activated, `pressed` is continuously `true` until the input is released.
@@ -196,15 +196,15 @@ fn keyboard_input_system(
 ```
 
 [`ButtonInput`]: https://docs.rs/bevy/latest/bevy/input/struct.ButtonInput.html
-[`pressed`]: https://docs.rs/bevy/latest/bevy/input/struct.ButtonInput.html#method.pressed
-[`just_pressed`]: https://docs.rs/bevy/latest/bevy/input/struct.ButtonInput.html#method.just_pressed
-[`just_released`]: https://docs.rs/bevy/latest/bevy/input/struct.ButtonInput.html#method.just_released
+[`ButtonInput::pressed`]: https://docs.rs/bevy/latest/bevy/input/struct.ButtonInput.html#method.pressed
+[`ButtonInput::just_pressed`]: https://docs.rs/bevy/latest/bevy/input/struct.ButtonInput.html#method.just_pressed
+[`ButtonInput::just_released`]: https://docs.rs/bevy/latest/bevy/input/struct.ButtonInput.html#method.just_released
 
 ### Button Combinations
 
 Button combinations can be made by accessing multiple buttons within a `ButtonInput` or `Gamepad`.
-Using the [`any_pressed`], [`any_just_pressed`], or [`any_just_released`] methods allow us to establish AND logic for handling combinations.
-Alternatively, we could use the [`all_pressed`], [`all_just_pressed`], and [`all_just_released`] methods and supply a list of button inputs instead.
+Using the [`ButtonInput::any_pressed`], [`ButtonInput::any_just_pressed`], or [`ButtonInput::any_just_released`] methods (along with their `Gamepad` equivalents) allow us to establish AND logic for handling combinations.
+Alternatively, we could use the [`ButtonInput::all_pressed`], [`ButtonInput::all_just_pressed`], and [`ButtonInput::all_just_released`] methods and supply a list of button inputs instead.
 
 ```rust
 // This system prints when `Ctrl + Shift + A` is pressed.
@@ -225,7 +225,7 @@ fn strict_keyboard_combo(input: Res<ButtonInput<KeyCode>>) {
 ```
 
 We can also access a collection of every button that is being interacted with on a given frame.
-Using [`get_pressed`], [`get_just_pressed`], or [`get_just_released`] will return an [`Iterator`] (specifically an [`ExactSizeIterator`]) of all currently pressed, just pressed, or just released buttons.
+Using [`ButtonInput::get_pressed`], [`ButtonInput::get_just_pressed`], or [`ButtonInput::get_just_released`] will return an [`Iterator`] (specifically an [`ExactSizeIterator`]) of all currently pressed, just pressed, or just released buttons.
 Any of these options can be preferable when processing a lot of input data at once since you can iterate over all relevant buttons.
 As an example, if you want the `Escape` key to always be evaluated first (but not evaluated separately), we can use `get_pressed` to see if its being pressed.
 
@@ -237,15 +237,15 @@ fn get_all_pressed_buttons(input: Res<ButtonInput<KeyCode>>) {
 }
 ```
 
-[`any_pressed`]: https://docs.rs/bevy/latest/bevy/input/struct.ButtonInput.html#method.any_pressed
-[`any_just_pressed`]: https://docs.rs/bevy/latest/bevy/input/struct.ButtonInput.html#method.any_just_pressed
-[`any_just_released`]: https://docs.rs/bevy/latest/bevy/input/struct.ButtonInput.html#method.any_just_released
-[`all_pressed`]: https://docs.rs/bevy/latest/bevy/input/struct.ButtonInput.html#method.all_pressed
-[`all_just_pressed`]: https://docs.rs/bevy/latest/bevy/input/struct.ButtonInput.html#method.all_just_pressed
-[`all_just_released`]: https://docs.rs/bevy/latest/bevy/input/struct.ButtonInput.html#method.all_just_released
-[`get_pressed`]: https://docs.rs/bevy/latest/bevy/input/struct.ButtonInput.html#method.get_pressed
-[`get_just_pressed`]: https://docs.rs/bevy/latest/bevy/input/struct.ButtonInput.html#method.get_just_pressed
-[`get_just_released`]: https://docs.rs/bevy/latest/bevy/input/struct.ButtonInput.html#method.get_just_released
+[`ButtonInput::any_pressed`]: https://docs.rs/bevy/latest/bevy/input/struct.ButtonInput.html#method.any_pressed
+[`ButtonInput::any_just_pressed`]: https://docs.rs/bevy/latest/bevy/input/struct.ButtonInput.html#method.any_just_pressed
+[`ButtonInput::any_just_released`]: https://docs.rs/bevy/latest/bevy/input/struct.ButtonInput.html#method.any_just_released
+[`ButtonInput::all_pressed`]: https://docs.rs/bevy/latest/bevy/input/struct.ButtonInput.html#method.all_pressed
+[`ButtonInput::all_just_pressed`]: https://docs.rs/bevy/latest/bevy/input/struct.ButtonInput.html#method.all_just_pressed
+[`ButtonInput::all_just_released`]: https://docs.rs/bevy/latest/bevy/input/struct.ButtonInput.html#method.all_just_released
+[`ButtonInput::get_pressed`]: https://docs.rs/bevy/latest/bevy/input/struct.ButtonInput.html#method.get_pressed
+[`ButtonInput::get_just_pressed`]: https://docs.rs/bevy/latest/bevy/input/struct.ButtonInput.html#method.get_just_pressed
+[`ButtonInput::get_just_released`]: https://docs.rs/bevy/latest/bevy/input/struct.ButtonInput.html#method.get_just_released
 [`Iterator`]: https://doc.rust-lang.org/nightly/core/iter/trait.Iterator.html
 [`ExactSizeIterator`]: https://doc.rust-lang.org/nightly/core/iter/trait.ExactSizeIterator.html
 
@@ -253,7 +253,7 @@ fn get_all_pressed_buttons(input: Res<ButtonInput<KeyCode>>) {
 
 Since `ButtonInput` is accessed as a `Resource`, we also have the ability to alter its data through a `ResMut` system parameter.
 This can be especially helpful if we want to clear all input from a specific key or button, or even reset all input from the entire device.
-The [`clear`], [`clear_just_pressed`], and [`clear_just_released`] methods allow us to remove the current state of a button input.
+The [`ButtonInput::clear`], [`ButtonInput::clear_just_pressed`], and [`ButtonInput::clear_just_released`] methods allow us to remove the current state of a button input.
 For example, if we use `clear_just_pressed` on a button input, we won't receive a `true` value from calling `just_pressed` on that button input until a new button press occurs.
 
 ```rust
@@ -265,7 +265,7 @@ fn clear_a_mouse_click(mut mouse_clicks: ResMut<ButtonInput<MouseButton>>) {
 }
 ```
 
-If we want to go one step further, we also have the [`reset`] and [`reset_all`] methods which will completely reset the state of either a single button or all buttons.
+If we want to go one step further, we also have the [`ButtonInput::reset`] and [`ButtonInput::reset_all`] methods which will completely reset the state of either a single button or all buttons.
 
 ```rust
 // Reset all MouseButton states.
@@ -276,7 +276,7 @@ fn clear_all_mouse_clicks(mut mouse_clicks: ResMut<ButtonInput<MouseButton>>) {
 }
 ```
 
-Finally, we also have the [`release`] and [`release_all`] methods which will register a release event.
+Finally, we also have the [`ButtonInput::release`] and [`ButtonInput::release_all`] methods which will register a release event.
 `release` allows you to generate a release event for a specific button, while `release_all` will create release events for every button on the device.
 These methods can be helpful in situations where the player continuously holding a button press would cause issues for your game.
 
@@ -294,13 +294,52 @@ fn only_trigger_once(mut input: ResMut<ButtonInput<MouseButton>>, mut commands: 
 }
 ```
 
-[`clear`]: https://docs.rs/bevy/latest/bevy/input/struct.ButtonInput.html#method.clear
-[`clear_just_pressed`]: https://docs.rs/bevy/latest/bevy/input/struct.ButtonInput.html#method.clear_just_pressed
-[`clear_just_released`]: https://docs.rs/bevy/latest/bevy/input/struct.ButtonInput.html#method.clear_just_released
-[`reset`]: https://docs.rs/bevy/latest/bevy/input/struct.ButtonInput.html#method.reset
-[`reset_all`]: https://docs.rs/bevy/latest/bevy/input/struct.ButtonInput.html#method.reset_all
+[`ButtonInput::clear`]: https://docs.rs/bevy/latest/bevy/input/struct.ButtonInput.html#method.clear
+[`ButtonInput::clear_just_pressed`]: https://docs.rs/bevy/latest/bevy/input/struct.ButtonInput.html#method.clear_just_pressed
+[`ButtonInput::clear_just_released`]: https://docs.rs/bevy/latest/bevy/input/struct.ButtonInput.html#method.clear_just_released
+[`ButtonInput::reset`]: https://docs.rs/bevy/latest/bevy/input/struct.ButtonInput.html#method.reset
+[`ButtonInput::reset_all`]: https://docs.rs/bevy/latest/bevy/input/struct.ButtonInput.html#method.reset_all
+[`ButtonInput::release`]: https://docs.rs/bevy/latest/bevy/input/struct.ButtonInput.html#method.release
+[`ButtonInput::release_all`]: https://docs.rs/bevy/latest/bevy/input/struct.ButtonInput.html#method.release_all
 
-[`release`]: https://docs.rs/bevy/latest/bevy/input/struct.ButtonInput.html#method.release
-[`release_all`]: https://docs.rs/bevy/latest/bevy/input/struct.ButtonInput.html#method.release_all
+### Customizing Gamepad Settings
 
-### Axis Inputs
+Sometimes you might find that Bevy's default gamepad settings aren't quite what you need.
+Maybe you want to adjust the threshold that indicates a button is being pressed, or you have to filter joystick data to avoid "stick drift".
+Both of these scenarios (and many more) can be remedied by constructing your own [`GamepadSettings`] struct and connecting it with a `Gamepad`.
+
+Every `Gamepad` can have an associated `GamepadSettings` struct that is used to filter the inputs based on some criteria.
+Like a `Gamepad`, `GamepadSettings` is really just a container for three values: [`ButtonSettings`], [`ButtonAxisSettings`], and [`AxisSettings`].
+The first two values help define the thresholds that determine when a button is "pressed" and "released", while the last value allows you to adjust the values that activate the joystick axes.
+You aren't required to define all three values; if you don't define a value, Bevy will automatically use a default value.
+As well, you'll have to create a custom settings value for each individual `GamepadButton` or `GamepadAxis` variant you want to adjust. 
+
+To create and use a `GamepadSettings` struct, we have to insert it into the same entity that holds the target `Gamepad` struct.
+Once inserted, Bevy will filter all of the target `Gamepad` inputs by the value you setup in your custom `GamepadSettings` struct.
+
+```rust
+fn gamepad_settings(
+    mut commands: Commands,
+    gamepads: Query<(Entity, &Gamepad)>
+) {
+    for (entity, _) in gamepads.iter() {
+        // Create a custom `AxisSettings` for the LeftStick X axis.
+        let Ok(left_stick_x_setting) = AxisSettings::new(-0.5, -0.1, 0.1, 0.5, 1.0) else {
+            continue;
+        };
+        // Initialize a new `GamepadSettings`.
+        let mut settings = GamepadSettings::default();
+        // Insert the custom `AxisSettings` into the `GamepadSettings`.
+        settings.axis_settings.insert(GamepadAxis::LeftStickX, left_stick_x_setting);
+        // Insert the `GamepadSettings` into the entity.
+        commands.entity(entity).insert(settings);
+    }
+}
+```
+
+[`GamepadSettings`]: https://docs.rs/bevy/latest/bevy/prelude/struct.GamepadSettings.html
+[`ButtonSettings`]: https://docs.rs/bevy/latest/bevy/input/gamepad/struct.ButtonSettings.html
+[`ButtonAxisSettings`]: https://docs.rs/bevy/latest/bevy/input/gamepad/struct.ButtonAxisSettings.html
+[`AxisSettings`]: https://docs.rs/bevy/latest/bevy/input/gamepad/struct.AxisSettings.html
+
+### Rumble/Haptic Feedback
