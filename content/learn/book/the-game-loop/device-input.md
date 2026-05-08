@@ -13,18 +13,18 @@ Additionally, we might also want to know the context that the input was created 
 Is a button being actively held down?
 Was a button just released?
 Is an input being repeatedly sent?
-Fortunately, Bevy's [`bevy_input`] subcrate provides all of the tools to automatically setup, process, and make available any input data your game or library requires.
+Fortunately, the [`bevy_input`] subcrate provides all of the tools to automatically setup, process, and make available any input data your game or library requires.
 
 {% callout(type="warning") %}
 ## Creating Player Controls 
 
-While `bevy_input` provides a plethora of handy tools for interacting with input data, it _is not recommended_ to directly use it for creating control schemes for your game.
+While `bevy_input` provides a plethora of handy tools for interacting with input data, _it is not recommended_ to directly use it for creating control schemes for your game.
 These tools are made for parsing input data directly from devices through [Winit], an external crate used to capture input data.
 They might suffice for simple games or for testing and debugging, however these tools can be cumbersome (if not overtly detrimental) if you do not plan for how they're used in your game.
 
 Instead, it's more likely that you'll want to use an **input manager** for establishing the control schemes in your games.
 An input manager allows you to assign actions to specific inputs without needing to directly handle the input data itself.
-It provides a great deal of flexiblility when it comes to creating control schemes, such as allowing for different keybindings, accounting for different contexts, or integrating UI elements into a control scheme.
+They provide a great deal of flexiblility when it comes to creating control schemes, such as allowing for different keybindings, accounting for different contexts, or integrating UI elements into a control scheme.
 
 Bevy currently does not have a built-in solution for this, however we can point you towards several community crates that provide these features:
 
@@ -116,7 +116,7 @@ We aren't able to use a `Resource` for gamepads as there could be multiple gamep
 
 Each gamepad is functionally identical in Bevy.
 A `Gamepad` contains some metadata about the gamepad (like its name or device ID) and two components: a `ButtonInput` containing all [`GamepadButton`]s and an `Axis` containing all [`GamepadAxis`] inputs.
-The `GamepadButton` type is an enum containing a list of buttons that Bevy recognizes for gamepads (like DPads, triggers, start buttons, etc.), while `GamepadAxis` is an enum with all potential joytstick inputs for a gamepad.
+The `GamepadButton` type is an enum containing a list of buttons that Bevy recognizes for gamepads (like DPads, triggers, start buttons, etc.), while the `GamepadAxis` type is an enum with all potential joytstick inputs for a gamepad.
 
 ```rust
 fn gamepad_system(gamepads: Query<(Entity, &Gamepad)>) {
@@ -171,10 +171,10 @@ However, the direction you move the joystick in is not "press-able", and therefo
 Each [`ButtonInput`] resource and [`Gamepad`] component provide us with methods that let us access information about the state of a button.
 For example, both `ButtonInput` and `Gamepad` have methods which return a `bool` based on if the button has just been pressed ([`ButtonInput::just_pressed`]), is currently being pressed ([`ButtonInput::pressed`]), or if its just been released ([`ButtonInput::just_released`]).
 
-Although it might appear like the difference between [`pressed`] and [`just_pressed`] is negligible, the two are quite distinct.
+Although it might appear like the difference between [`ButtonInput::pressed`] and [`ButtonInput::just_pressed`] is negligible, the two are quite distinct.
 While both signal a `ButtonInput` button being activated, `pressed` is continuously `true` until the input is released.
 `just_pressed` will only be `true` for _a single frame_ after the input is activated.
-The same is true for [`just_released`], which will only be `true` for a single frame after the input is deactivated.
+The same is true for [`ButtonInput::just_released`], which will only be `true` for a single frame after the input is deactivated.
 
 ```rust
 fn keyboard_input_system(
@@ -324,9 +324,8 @@ fn gamepad_settings(
 ) {
     for (entity, _) in gamepads.iter() {
         // Create a custom `AxisSettings` for the LeftStick X axis.
-        let Ok(left_stick_x_setting) = AxisSettings::new(-0.5, -0.1, 0.1, 0.5, 1.0) else {
-            continue;
-        };
+        let Ok(left_stick_x_setting) = AxisSettings::new(-0.5, -0.1, 0.1, 0.5, 1.0) 
+            else { continue; };
         // Initialize a new `GamepadSettings`.
         let mut settings = GamepadSettings::default();
         // Insert the custom `AxisSettings` into the `GamepadSettings`.
@@ -343,3 +342,50 @@ fn gamepad_settings(
 [`AxisSettings`]: https://docs.rs/bevy/latest/bevy/input/gamepad/struct.AxisSettings.html
 
 ### Rumble/Haptic Feedback
+
+Some gamepads are able to provide haptic feedback (vibrations/rumble) to the player.
+However, haptic feedback is provided by the game, not the player, therefore we don't have to wait for Bevy to get an input event from Winit.
+Instead, we're able to send the haptic feedback by writing a [`GamepadRumbleRequest`] message.
+
+```rust
+fn gamepad_system(
+    gamepads: Query<(Entity, &Gamepad)>,
+    mut rumble_requests: MessageWriter<GamepadRumbleRequest>,
+) {
+    for (entity, gamepad) in &gamepads {
+        if gamepad.just_pressed(GamepadButton::North) {
+            info!(
+                "North face button: strong (low-frequency) with low intensity for rumble for 5 seconds. Press multiple times to increase intensity."
+            );
+            rumble_requests.write(GamepadRumbleRequest::Add {
+                gamepad: entity,
+                intensity: GamepadRumbleIntensity::strong_motor(0.1),
+                duration: Duration::from_secs(5),
+            });
+        }
+    }
+}
+```
+
+`GamepadRumbleRequest` is actually an `Enum` with two variants: `Start` and `Stop`.
+Both require specifying which gamepad `Entity` the haptic feedback should be sent to, but the `Start` variant also includes some additional fields.
+The `intensity` field takes a [`GamepadRumbleIntensity`] value which controls how intense the motor rumble.
+The `duration` field controls how long the haptic feedback will last for, taking a [`Duration`] value.
+
+```rust
+fn gamepad_system(
+    gamepads: Query<(Entity, &Gamepad)>,
+    mut rumble_requests: MessageWriter<GamepadRumbleRequest>,
+) {
+    for (entity, gamepad) in &gamepads {
+        if gamepad.just_pressed(GamepadButton::Start) {
+            info!("Start button: Interrupt the current rumble");
+            rumble_requests.write(GamepadRumbleRequest::Stop { gamepad: entity });
+        }
+    }
+}
+```
+
+[`GamepadRumbleRequest`]: https://docs.rs/bevy/latest/bevy/input/gamepad/enum.GamepadRumbleRequest.html
+[`GamepadRumbleIntensity`]: https://docs.rs/bevy/latest/bevy/input/gamepad/struct.GamepadRumbleIntensity.html
+[`Duration`]: https://doc.rust-lang.org/nightly/core/time/struct.Duration.html
